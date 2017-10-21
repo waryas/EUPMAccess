@@ -101,7 +101,7 @@ static HANDLE OpenPhysicalMemory()
 
 int isAscii(int c)
 {
-	return((c >= 'A' && c <= 'z') || c == 0x20);
+	return((c >= 'A' && c <= 'z') || (c >= '0' && c <= '9') || c == 0x20 || c == '@' || c == '_' || c == '?');
 }
 
 int isPrintable(uint32_t uint32)
@@ -166,7 +166,7 @@ int main()
 				cursor += skipsize;
 			}
 
-			if ((ULONGLONG)(cursor - myIo.virtualmemory) >= myIo.read.QuadPart)
+			if ((ULONGLONG)(cursor - myIo.virtualmemory)+ sizeof(_POOL_HEADER) + sizeof(_OBJECT_HEADER) > myIo.read.QuadPart) //dirty hack....
 			{
 				if (!DriverUnmapMemory(hDriver, &myIo)) {
 					printf("Failed to unmap memory?\n");
@@ -177,6 +177,7 @@ int main()
 				DriverMapMemory(hDriver, &myIo);
 				cursor = (char*)myIo.virtualmemory;
 			}
+			
 		}
 	}
 	if (!bFound) {
