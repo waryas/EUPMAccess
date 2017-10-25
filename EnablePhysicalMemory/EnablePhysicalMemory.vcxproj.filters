@@ -24,12 +24,21 @@
     <ClInclude Include="AMMAP64.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SuperfetchNative.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Superfetch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EnablePhysicalMemory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="AMMAP64.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Superfetch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

