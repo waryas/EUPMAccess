@@ -1,2 +1,8 @@
 
 asmmap64.sys
+*.db
+*.opendb
+*.ipch
+*.vcxproj
+*.vcxproj
+EnablePhysicalMemory/EnablePhysicalMemory.vcxproj
