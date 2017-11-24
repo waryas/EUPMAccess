@@ -24,10 +24,10 @@
     <ClInclude Include="AMMAP64.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SuperfetchNative.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Superfetch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SuperfetchNative.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

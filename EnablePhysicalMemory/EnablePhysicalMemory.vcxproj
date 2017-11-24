@@ -23,7 +23,7 @@
     <ProjectGuid>{643231AB-55CD-4890-9E4B-3A683579F014}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>EnablePhysicalMemory</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

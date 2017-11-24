@@ -246,4 +246,74 @@ extern "C" NTSTATUS NTAPI RtlAdjustPrivilege(
 #define SUPERFETCH_VERSION      45
 #define SUPERFETCH_MAGIC        'kuhC'
 
+#define FIELD_OFFSET(type, field)    ((LONG)(LONG_PTR)&(((type *)0)->field))
+#define MI_GET_PFN(x)                   (PMMPFN_IDENTITY)(&MmPfnDatabase->PageData[(x)])
+
+typedef struct _SYSTEM_MEMORY_LIST_INFORMATION {
+	SIZE_T ZeroPageCount;
+	SIZE_T FreePageCount;
+	SIZE_T ModifiedPageCount;
+	SIZE_T ModifiedNoWritePageCount;
+	SIZE_T BadPageCount;
+	SIZE_T PageCountByPriority[8];
+	SIZE_T RepurposedPagesByPriority[8];
+	ULONG_PTR ModifiedPageCountPageFile;
+} SYSTEM_MEMORY_LIST_INFORMATION, *PSYSTEM_MEMORY_LIST_INFO;
+
+typedef struct _MEMORY_FRAME_INFORMATION {
+	ULONGLONG UseDescription : 4;
+	ULONGLONG ListDescription : 3;
+	ULONGLONG Reserved0 : 1;
+	ULONGLONG Pinned : 1;
+	ULONGLONG DontUse : 48;
+	ULONGLONG Priority : 3;
+	ULONGLONG Reserved : 4;
+} MEMORY_FRAME_INFORMATION, *PMEMORY_FRAME_INFORMATION;
+
+typedef struct _FILEOFFSET_INFORMATION {
+	ULONGLONG DontUse : 9;
+	ULONGLONG Offset : 48;
+	ULONGLONG Reserved : 7;
+} FILEOFFSET_INFORMATION, *PFILEOFFSET_INFORMATION;
+
+typedef struct _PAGEDIR_INFORMATION {
+	ULONGLONG DontUse : 9;
+	ULONGLONG PageDirectoryBase : 48;
+	ULONGLONG Reserved : 7;
+} PAGEDIR_INFORMATION, *PPAGEDIR_INFORMATION;
+
+typedef struct _UNIQUE_PROCESS_INFORMATION {
+	ULONGLONG DontUse : 9;
+	ULONGLONG UniqueProcessKey : 48;
+	ULONGLONG Reserved : 7;
+} UNIQUE_PROCESS_INFORMATION, *PUNIQUE_PROCESS_INFORMATION;
+
+typedef struct _MMPFN_IDENTITY {
+	union {
+		MEMORY_FRAME_INFORMATION e1;
+		FILEOFFSET_INFORMATION e2;
+		PAGEDIR_INFORMATION e3;
+		UNIQUE_PROCESS_INFORMATION e4;
+	} u1;
+	SIZE_T PageFrameIndex;
+	union {
+		struct {
+			ULONG Image : 1;
+			ULONG Mismatch : 1;
+		} e1;
+		PVOID FileObject;
+		PVOID UniqueFileObjectKey;
+		PVOID ProtoPteAddress;
+		PVOID VirtualAddress;
+	} u2;
+} MMPFN_IDENTITY, *PMMPFN_IDENTITY;
+
+typedef struct _PF_PFN_PRIO_REQUEST {
+	ULONG Version;
+	ULONG RequestFlags;
+	SIZE_T PfnCount;
+	SYSTEM_MEMORY_LIST_INFORMATION MemInfo;
+	MMPFN_IDENTITY PageData[256];
+} PF_PFN_PRIO_REQUEST, *PPF_PFN_PRIO_REQUEST;
+
 #endif

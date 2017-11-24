@@ -59,7 +59,7 @@ bool SFSetup()
 	return true;
 }
 
-bool SFGetMemoryInfo(SFMemoryInfo* pInfo, int& rCount)
+PfnList* SFGetMemoryInfo(SFMemoryInfo* pInfo, int& rCount)
 {
 	PPF_MEMORY_RANGE_INFO MemoryRanges;	
 	SUPERFETCH_INFORMATION SuperfetchInfo;
@@ -84,15 +84,54 @@ bool SFGetMemoryInfo(SFMemoryInfo* pInfo, int& rCount)
 
 	rCount = 0;
 	PPHYSICAL_MEMORY_RUN Node;
+	auto MmHighestPhysicalPageNumber = 0;
 	for (ULONG i = 0; i < MemoryRanges->RangeCount; i++) {
 		Node = reinterpret_cast<PPHYSICAL_MEMORY_RUN>(&MemoryRanges->Ranges[i]);
 		pInfo[i].Start = Node->BasePage << PAGE_SHIFT;
 		pInfo[i].End = (Node->BasePage + Node->PageCount) << PAGE_SHIFT;
+		MmHighestPhysicalPageNumber = Node->BasePage + Node->PageCount;
 		pInfo[i].PageCount = Node->PageCount;
 		pInfo[i].Size = ((Node->PageCount << PAGE_SHIFT) >> 10) * 1024; // kb to byte
 		rCount++;
 	}
-	return true;
+
+	auto PfnCount = MmHighestPhysicalPageNumber;
+	auto MmPfnDatabaseSize = FIELD_OFFSET(PF_PFN_PRIO_REQUEST, PageData) + PfnCount * sizeof(MMPFN_IDENTITY);
+	auto MmPfnDatabase = static_cast<PPF_PFN_PRIO_REQUEST>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, MmPfnDatabaseSize));
+
+	MmPfnDatabase->Version = 1;
+	MmPfnDatabase->RequestFlags = 1;
+
+	SFBuildInfo(&SuperfetchInfo,
+		MmPfnDatabase,
+		MmPfnDatabaseSize,
+		SuperfetchPfnQuery);
+
+	for (auto k = 0, i = 0; i < MemoryRanges->RangeCount; i++) {
+
+		Node = reinterpret_cast<PPHYSICAL_MEMORY_RUN>(&MemoryRanges->Ranges[i]);
+		for (SIZE_T j = Node->BasePage; j < (Node->BasePage + Node->PageCount); j++) {
+			auto Pfn1 = MI_GET_PFN(k++);
+			Pfn1->PageFrameIndex = j;
+
+		}
+		MmPfnDatabase->PfnCount = k;
+	}
+
+	auto Status = NtQuerySystemInformation(SystemSuperfetchInformation, &SuperfetchInfo, sizeof(SuperfetchInfo), &ResultLength);
+
+	if (!Status) //Success
+	{
+		PfnList *myPfn = (PfnList*)malloc(sizeof(PfnList)*MmHighestPhysicalPageNumber);
+		memset(myPfn, 0, sizeof(PfnList) * MmPfnDatabase->PfnCount);
+		for (auto i = 0; i < MmPfnDatabase->PfnCount; i++) {
+			if (MmPfnDatabase->PageData[i].u1.e1.UseDescription == 4 || MmPfnDatabase->PageData[i].u1.e1.UseDescription == 5)
+				myPfn[MmPfnDatabase->PageData[i].PageFrameIndex].isPool = true;
+		}
+		return myPfn;
+	}
+
+	return false;
 }
 
 uint64_t SFGetNtBase()

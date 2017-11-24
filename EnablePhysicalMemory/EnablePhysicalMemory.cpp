@@ -127,6 +127,9 @@ bool isInsidePhysicalRAM(uint64_t addr, SFMemoryInfo* mi, int nOfRange) {
 	return false;
 }
 
+bool isPoolPage(uint64_t addr, PfnList* pfnList) {
+	return pfnList[(addr / 0x1000)].isPool;
+}
 int main()
 {
 	printf("Usermode physical memory access enabler\n");
@@ -149,7 +152,8 @@ int main()
 
 	SFMemoryInfo myRanges[32] = { 0 };
 	int nOfRange = 0;
-	SFGetMemoryInfo(myRanges, nOfRange);
+	auto pfnTable = SFGetMemoryInfo(myRanges, nOfRange);
+
 	myRanges[nOfRange - 1].End -= 0x1000;
 	IoCommand myIo = { 0 };
 	myIo.offset = 0x0;
@@ -161,9 +165,13 @@ int main()
 
 		auto i = 0ULL;
 		for (i = 0; i < myRanges[nOfRange - 1].End; i += 0x1000) {
-			if (bFound)
+			if (bFound) {
+				DriverUnmapMemory(hDriver, &myIo);
 				break;
+			}
 			if (!isInsidePhysicalRAM(i, myRanges, nOfRange))
+				continue;
+			if (!isPoolPage)
 				continue;
 			if (!DriverUnmapMemory(hDriver, &myIo))
 				break;

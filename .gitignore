@@ -6,3 +6,13 @@ asmmap64.sys
 *.vcxproj
 *.vcxproj
 EnablePhysicalMemory/EnablePhysicalMemory.vcxproj
+.vs/EnablePhysicalMemory/v15/.suo
+*.vcxproj
+*.filters
+*.obj
+*.tlog
+*.log
+*.idb
+*.pdb
+*.ilk
+*.exe

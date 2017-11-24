@@ -10,8 +10,12 @@ struct SFMemoryInfo
 	uint64_t Size;
 };
 
+struct PfnList {
+	bool isPool;
+};
+
 bool     SFSetup();
-bool	 SFGetMemoryInfo(SFMemoryInfo* pInfo, int& rCount);
+PfnList* SFGetMemoryInfo(SFMemoryInfo* pInfo, int& rCount);
 uint64_t SFGetModuleBase(char* module);
 uint64_t SFGetNtBase();
 uint64_t SFGetWin32kBase();
